@@ -402,6 +402,9 @@ class FileManagerModule(_ModuleBase):
             # 整理方式
             if not transfer_type:
                 transfer_type = target_directory.transfer_type
+            # 目标存储
+            if not target_storage:
+                target_storage = target_directory.library_storage
             # 是否需要重命名
             need_rename = target_directory.renaming
             # 是否需要通知
@@ -1311,7 +1314,8 @@ class FileManagerModule(_ModuleBase):
             if media_files:
                 for media_file in media_files:
                     if f".{media_file.extension.lower()}" in settings.RMT_MEDIAEXT:
-                        ret_fileitems.append(media_file)
+                        if media_file not in ret_fileitems:
+                            ret_fileitems.append(media_file)
         return ret_fileitems
 
     def media_exists(self, mediainfo: MediaInfo, **kwargs) -> Optional[ExistMediaInfo]:

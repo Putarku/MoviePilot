@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import re
 import secrets
@@ -89,6 +90,8 @@ class ConfigModel(BaseModel):
     PROXY_HOST: Optional[str] = None
     # 登录页面电影海报,tmdb/bing/mediaserver
     WALLPAPER: str = "tmdb"
+    # 自定义壁纸api地址
+    CUSTOMIZE_WALLPAPER_API_URL: Optional[str] = None
     # 媒体搜索来源 themoviedb/douban/bangumi，多个用,分隔
     SEARCH_SOURCE: str = "themoviedb,douban,bangumi"
     # 媒体识别来源 themoviedb/douban
@@ -103,6 +106,8 @@ class ConfigModel(BaseModel):
     TMDB_API_DOMAIN: str = "api.themoviedb.org"
     # TMDB元数据语言
     TMDB_LOCALE: str = "zh"
+    # 刮削使用TMDB原始语种图片
+    TMDB_SCRAP_ORIGINAL_IMAGE: bool = False
     # TMDB API Key
     TMDB_API_KEY: str = "db55323b8d3e4154498498a75642b381"
     # TVDB API Key
@@ -215,7 +220,16 @@ class ConfigModel(BaseModel):
                           "https://github.com/thsrite/MoviePilot-Plugins,"
                           "https://github.com/honue/MoviePilot-Plugins,"
                           "https://github.com/InfinityPacer/MoviePilot-Plugins,"
-                          "https://github.com/DDS-Derek/MoviePilot-Plugins")
+                          "https://github.com/DDS-Derek/MoviePilot-Plugins,"
+                          "https://github.com/madrays/MoviePilot-Plugins,"
+                          "https://github.com/justzerock/MoviePilot-Plugins,"
+                          "https://github.com/KoWming/MoviePilot-Plugins,"
+                          "https://github.com/wikrin/MoviePilot-Plugins,"
+                          "https://github.com/HankunYu/MoviePilot-Plugins,"
+                          "https://github.com/baozaodetudou/MoviePilot-Plugins,"
+                          "https://github.com/Aqr-K/MoviePilot-Plugins,"
+                          "https://github.com/hotlcc/MoviePilot-Plugins-Third,"
+                          "https://github.com/gxterry/MoviePilot-Plugins")
     # 插件安装数据共享
     PLUGIN_STATISTIC_SHARE: bool = True
     # 是否开启插件热加载
@@ -356,13 +370,16 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
                 if field_name in fields_not_keep_spaces:
                     value = re.sub(r"\s+", "", value)
                 return value, str(value) != str(original_value)
-            # # 后续考虑支持 list 类型的处理
-            # elif expected_type is list:
-            #     if isinstance(value, list):
-            #         return value, False
-            #     if isinstance(value, str):
-            #         items = [item.strip() for item in value.split(",") if item.strip()]
-            #         return items, items != original_value.split(",")
+            # 支持 list 类型的处理
+            elif expected_type is list:
+                if isinstance(value, list):
+                    return value, str(value) != str(original_value)
+                if isinstance(value, str):
+                    items = json.loads(value)
+                    if isinstance(original_value, list):
+                        return items, items != original_value
+                    else:
+                        return items, str(items) != str(original_value)
             # 可根据需要添加更多类型处理
             else:
                 return value, str(value) != str(original_value)
@@ -403,7 +420,13 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
             logger.warning(message)
             return False, message
         else:
-            set_key(SystemUtils.get_env_path(), field.name, str(converted_value) if converted_value is not None else "")
+            # 如果是列表、字典或集合类型，将其转换为JSON字符串
+            if isinstance(converted_value, (list, dict, set)):
+                value_to_write = json.dumps(converted_value)
+            else:
+                value_to_write = str(converted_value) if converted_value is not None else ""
+
+            set_key(SystemUtils.get_env_path(), field.name, value_to_write)
             if is_converted:
                 logger.info(f"配置项 '{field.name}' 已自动修正并写入到 'app.env' 文件")
         return True, message
@@ -550,6 +573,7 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
             return {
                 "server": self.PROXY_HOST
             }
+        return None
 
     @property
     def GITHUB_HEADERS(self):
